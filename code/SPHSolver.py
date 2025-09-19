@@ -13,6 +13,20 @@ class SPHSolver:
         # ...
 
         pass
+    def cubic_spline_kernel(r, h):
+    
+        alpha = 1.0 / h
+        R = abs(r) / h
+        
+        # calculating using the R conditions
+        if R >= 0 and R < 1:
+            W = alpha * (2.0/3.0 - R**2 + 0.5 * R**3)
+        elif R >= 1 and R < 2:
+            W = alpha * (1.0/6.0) * (2.0 - R)**3
+        else:
+            W = 0.0
+        
+        return W
 
     def f():
         """
