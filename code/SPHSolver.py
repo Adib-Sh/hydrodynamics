@@ -13,20 +13,38 @@ class SPHSolver:
         # ...
 
         pass
-    def cubic_spline_kernel(r, h):
+    
+    
+    def c_kernel(r, h):
     
         alpha = 1.0 / h
         R = abs(r) / h
         
         # calculating using the R conditions
         if R >= 0 and R < 1:
-            W = alpha * (2.0/3.0 - R**2 + 0.5 * R**3)
+            W = alpha * (2/3 - R**2 + 0.5 * R**3)
         elif R >= 1 and R < 2:
-            W = alpha * (1.0/6.0) * (2.0 - R)**3
+            W = alpha * (1/6) * (2.0 - R)**3
         else:
             W = 0.0
         
         return W
+    
+    def c_kernel_der(r, h):
+        
+        alpha = 1.0 / h
+        R = abs(r) / h
+        
+        
+        # Calculate derivative
+        if R >= 0 and R < 1:
+            dW_dr = alpha * (-2.0 + 1.5 * R) * R / h
+        elif R >= 1 and R < 2:
+            dW_dr = -alpha * 0.5 * (2.0 - R)**2 * R / r
+        else:
+            dW_dr = 0.0
+        
+        return dW_dr
 
     def f():
         """
