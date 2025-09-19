@@ -45,6 +45,16 @@ class SPHSolver:
             dW_dr = 0.0
         
         return dW_dr
+    
+    def phi (h_avg, v_avg, xij):
+        
+        phi_const = 0.1 * h_avg
+        
+        
+        phi_ij = h_avg * v_avg * xij / (abs(xij)**2 * phi_const)
+        
+        return phi_ij
+    
 
     def f():
         """
