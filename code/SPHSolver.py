@@ -8,7 +8,14 @@ class SPHSolver:
         When we create the SPHSolver instance, we assign all the user-set parameters and the
         initial condition here.
         """
-        # self.X_0 = X_0
+        self.pos = X_0[:, :3]
+        self.vel = X_0[:, 3:6]
+        self.m   = X_0[:, 6]
+        self.rho = X_0[:, 7]
+        self.p   = X_0[:, 8]
+        self.v   = X_0[:, 9]
+        self.e   = X_0[:, 10]
+        
         # self.delta_t = delta_t
         # ...
 
@@ -31,7 +38,7 @@ class SPHSolver:
         return W
 
     # kernel derivative function
-    def c_kernel_dx(r, h):
+    def c_kernel_dr(r, h):
         
         alpha = 1.0 / h
         R = abs(r) / h
