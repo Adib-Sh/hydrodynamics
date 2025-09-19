@@ -14,7 +14,7 @@ class SPHSolver:
 
         pass
     
-    
+    # kernel function
     def c_kernel(r, h):
     
         alpha = 1.0 / h
@@ -29,7 +29,8 @@ class SPHSolver:
             W = 0.0
         
         return W
-    
+
+    # kernel derivative function
     def c_kernel_dx(r, h):
         
         alpha = 1.0 / h
@@ -46,6 +47,7 @@ class SPHSolver:
         
         return dW_dr
     
+    # phi function
     def phi (h_avg, v_avg, xij):
         
         phi_const = 0.1 * h_avg
