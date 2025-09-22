@@ -59,10 +59,10 @@ class SPHSolver:
 
     def f(self, t, y):
         N = self.N
-        pos = self.pos
-        v = self.v
-        rho = self.rho
-        e = self.e
+        pos = y[0*N:1*N]
+        v   = y[1*N:2*N] 
+        rho = y[2*N:3*N]
+        e   = y[3*N:4*N]
 
         p = (self.gamma - 1.0) * rho * e
     
