@@ -25,7 +25,7 @@ class SPHSolver:
         # smoothing length
         rho_avg = np.mean(self.rho)
         m_avg = np.mean(self.m)
-        self.h = self.eta * (m_avg / rho_avg)**(1.0)  # 1D
+        self.h = 0.001 #self.eta * (m_avg / rho_avg)**(1.0)  # 1D
         
         print(f"  Particles: {self.N}")
         print(f"  Smoothing length h: {self.h:.6f}")
@@ -50,9 +50,9 @@ class SPHSolver:
         e = y[3*N:4*N]
         return x, v, rho, e
         
-    def kernel_cubic_spline(self, r, h):
-        R = np.abs(r) / h
-        alpha_d = 1.0 / h  # 1D normalization
+    def kernel_cubic_spline(self, dx, h):
+        R = np.abs(dx) / h
+        alpha_d = 1.0 / h
         
         W = np.zeros_like(R)
         
@@ -66,42 +66,40 @@ class SPHSolver:
         
         return W
     
-    def kernel_gradient(self, r, h):
-
-        R = np.abs(r) / h
-        alpha_d = 1.0 / h
+    def kernel_gradient(self, dx, h):
+         r = np.abs(dx)
+         R = r / h
+         alpha_d = 1.0 / h
+         dW_dx = np.zeros_like(dx)
+    
+         # 0 ≤ R < 1
+         mask1 = (R >= 0) & (R < 1)
+         dW_dx[mask1] = alpha_d * (-2 + 1.5 * R[mask1]) * r[mask1] / h**2
+    
+         # 1 ≤ R < 2
+         mask2 = (R >= 1) & (R < 2)
+         dW_dx[mask2] = -0.5 * alpha_d * (2 - R[mask2])**2 * dx[mask2]/(h*r[mask2])
+    
+         dW_dx *= np.sign(dx)
+    
+         return dW_dx
         
-        dW_dx = np.zeros_like(r)
-        
-        # Condition 0 ≤ R < 1
-        mask1 = (R >= 0) & (R < 1)
-        dW_dx[mask1] = alpha_d * (-2 + 1.5 * R[mask1]) / h
-        
-        # Condition 1 ≤ R < 2
-        mask2 = (R >= 1) & (R < 2)
-        dW_dx[mask2] = -alpha_d * 0.5 * (2 - R[mask2])**2 / (h * R[mask2] + 1e-12)
-
-        dW_dx *= np.sign(r)
-        dW_dx[np.abs(r) < 1e-12] = 0
-        
-        return dW_dx
-        
-    def equation_of_state(self, rho, e):
+    def p(self, rho, e):
         return (self.gamma - 1.0) * rho * e
         
     def sound_speed(self, e):
         return np.sqrt((self.gamma - 1.0) * np.maximum(e, 1e-10))
         
-    def artificial_viscosity(self, v_i, v_j, x_i, x_j, rho_i, rho_j, c_i, c_j, h_ij):
-        v_ij = v_i - v_j
-        x_ij = x_i - x_j
+    def artificial_viscosity(self, v_matrix, dx_matrix, rho_i, rho_j, c_i, c_j, h_ij):
+        v_ij = v_matrix
+        x_ij = dx_matrix
         r_ij = np.abs(x_ij)
         
         # mask for approaching particles (v_ij * x_ij < 0)
-        approaching_mask = (v_ij * x_ij) < 0
+        mask = (v_ij * x_ij) < 0
         
         phi_ij = np.zeros_like(x_ij)
-        phi_ij = np.where(approaching_mask, 
+        phi_ij = np.where(mask, 
                          (h_ij * v_ij * x_ij) / (r_ij**2 + (0.1 * h_ij)**2),
                          0.0)
         
@@ -109,13 +107,13 @@ class SPHSolver:
         c_avg = 0.5 * (c_i + c_j)
         
         # viscosity - only for approaching particles
-        Pi_ij = np.where(approaching_mask,
+        Pi_ij = np.where(mask,
                         (-self.alpha * c_avg * phi_ij + self.beta * phi_ij**2) / rho_avg,
                         0.0)
         
         return Pi_ij
     
-    def sph_equations_broadcast(self, t, y):
+    def sph(self, t, y):
 
         self.call_count += 1
         if self.call_count % 100 == 0:
@@ -123,50 +121,47 @@ class SPHSolver:
                 print(f"t={t:.6f}, calls={self.call_count:}")
 
         x, v, rho, e = self._unpack_state(y)
-        p = self.equation_of_state(rho, e)
+        p = self.p(rho, e)
         c = self.sound_speed(e)
-        x_matrix = x[:, np.newaxis] - x[np.newaxis, :]  # N x N matrix of x_i - x_j
-        r_matrix = np.abs(x_matrix)  # N x N matrix of distances
+        dx_matrix = x[:, np.newaxis] - x[np.newaxis, :]  # N x N matrix of x_i - x_j
+        r_matrix = np.abs(dx_matrix)  # N x N matrix of distances
         
-        # kernel support mask and matrices
-        support_mask = (r_matrix <= 2.0 * self.h) & (r_matrix > 1e-12)
-        W_matrix = np.zeros_like(r_matrix)
-        grad_W_matrix = np.zeros_like(x_matrix)
-        W_matrix[support_mask] = self.kernel_cubic_spline(r_matrix[support_mask], self.h)
-        grad_W_matrix[support_mask] = self.kernel_gradient(x_matrix[support_mask], self.h)
-        np.fill_diagonal(W_matrix, 0)
-        np.fill_diagonal(grad_W_matrix, 0)
         
-
+        W_matrix = np.zeros_like(dx_matrix)
+        grad_W_matrix = np.zeros_like(dx_matrix)
+        W_matrix = self.kernel_cubic_spline(dx_matrix, self.h)
+        grad_W_matrix = self.kernel_gradient(dx_matrix, self.h)
+        
         rho_new = np.sum(self.m * W_matrix, axis=1)
-        rho = np.maximum(rho_new, 0.01)
-
-        p = self.equation_of_state(rho, e)
+        p = self.p(rho_new, e)
         c = self.sound_speed(e)
         
-        # arrays for broadcasting
         m_matrix = self.m[np.newaxis, :]  # 1 x N mass matrix
-        rho_i_matrix = rho[:, np.newaxis]  # N x 1 density matrix
-        rho_j_matrix = rho[np.newaxis, :]  # 1 x N density matrix
+        rho_i_matrix = rho_new[:, np.newaxis]  # N x 1 density matrix
+        rho_j_matrix = rho_new[np.newaxis, :]  # 1 x N density matrix
         p_i_matrix = p[:, np.newaxis]  # N x 1 pressure matrix
         p_j_matrix = p[np.newaxis, :]  # 1 x N pressure matrix
         c_i_matrix = c[:, np.newaxis]  # N x 1 sound speed matrix
         c_j_matrix = c[np.newaxis, :]  # 1 x N sound speed matrix
         v_matrix = v[:, np.newaxis] - v[np.newaxis, :]  # N x N velocity difference matrix
-        
-        # Artificial viscosity
-        h_ij_matrix = np.full_like(x_matrix, self.h)
+        h_ij_matrix = np.full_like(dx_matrix, self.h)
         Pi_ij_matrix = self.artificial_viscosity(
-            v[:, np.newaxis], v[np.newaxis, :], 
-            x[:, np.newaxis], x[np.newaxis, :],
+            v_matrix, 
+            dx_matrix,
             rho_i_matrix, rho_j_matrix,
             c_i_matrix, c_j_matrix,
             h_ij_matrix
         )
-        
+        Pi_ij_matrix = self.artificial_viscosity(
+            v_matrix, 
+            dx_matrix,
+            rho_i_matrix, rho_j_matrix,
+            c_i_matrix, c_j_matrix,
+            h_ij_matrix
+        )
         pressure_term_matrix = (p_i_matrix / rho_i_matrix**2 + 
-                               p_j_matrix / rho_j_matrix**2 + 
-                               Pi_ij_matrix)
+                               p_j_matrix / rho_j_matrix**2)
+                               #+ Pi_ij_matrix)
         
         # Acceleration
         dv_dt = -np.sum(m_matrix * pressure_term_matrix * grad_W_matrix, axis=1)
@@ -178,15 +173,8 @@ class SPHSolver:
         dx_dt = v.copy()
         
         # Density
-        drho_dt = np.zeros_like(rho)
-        
-        max_accel = 1e3
-        dv_dt = np.clip(dv_dt, -max_accel, max_accel)
-        de_dt = np.clip(de_dt, -max_accel, max_accel)
-        
-        # Pack derivatives
+        drho_dt = np.zeros_like(rho_new)
         dy_dt = np.concatenate([dx_dt, dv_dt, drho_dt, de_dt])
-        
         return dy_dt
     
     def solve(self, t_final=0.2, dt_max=1e-5, method='RK45'):
@@ -204,7 +192,7 @@ class SPHSolver:
         
         # Solve using scipy
         sol = solve_ivp(
-            self.sph_equations_broadcast,
+            self.sph,
             t_span, 
             self.y0,
             method=method,
@@ -231,7 +219,7 @@ class SPHSolver:
 
         final_state = sol.y[:, -1]
         x, v, rho, e = self._unpack_state(final_state)
-        p = self.equation_of_state(rho, e)
+        p = self.p(rho, e)
         
         idx = np.argsort(x)
         x_sort = x[idx]
@@ -244,8 +232,12 @@ class SPHSolver:
         fig, axes = plt.subplots(2, 2, figsize=(12, 10))
         fig.suptitle(f"Sod Shock Tube (SPH) - t = {sol.t[-1]:.3f}s", fontsize=14)
         
+        # Create plots
+        fig, axes = plt.subplots(2, 2, figsize=(12, 10))
+        fig.suptitle(f"Sod Shock Tube (SPH) - t = {sol.t[-1]:.3f}s", fontsize=14)
+        
         # Pressure
-        axes[0,0].plot(x_sort, p_sort, 'b-o', markersize=2, label='SPH')
+        axes[0,0].scatter(x_sort, p_sort, s=10, c='b', marker='o', label='SPH')
         axes[0,0].set_xlabel('Position x (m)')
         axes[0,0].set_ylabel('Pressure p (Pa)')
         axes[0,0].set_title('Pressure')
@@ -253,7 +245,7 @@ class SPHSolver:
         axes[0,0].legend()
         
         # Density
-        axes[0,1].plot(x_sort, rho_sort, 'r-o', markersize=2, label='SPH')
+        axes[0,1].scatter(x_sort, rho_sort, s=10, c='r', marker='o', label='SPH')
         axes[0,1].set_xlabel('Position x (m)')
         axes[0,1].set_ylabel('Density ρ (kg/m³)')
         axes[0,1].set_title('Density')
@@ -261,7 +253,7 @@ class SPHSolver:
         axes[0,1].legend()
         
         # Velocity  
-        axes[1,0].plot(x_sort, v_sort, 'm-o', markersize=2, label='SPH')
+        axes[1,0].scatter(x_sort, v_sort, s=10, c='m', marker='o', label='SPH')
         axes[1,0].set_xlabel('Position x (m)')
         axes[1,0].set_ylabel('Velocity v (m/s)')
         axes[1,0].set_title('Velocity')
@@ -269,7 +261,7 @@ class SPHSolver:
         axes[1,0].legend()
         
         # Internal energy
-        axes[1,1].plot(x_sort, e_sort, 'g-o', markersize=2, label='SPH')
+        axes[1,1].scatter(x_sort, e_sort, s=10, c='g', marker='o', label='SPH')
         axes[1,1].set_xlabel('Position x (m)')
         axes[1,1].set_ylabel('Internal Energy e')
         axes[1,1].set_title('Internal Energy')
@@ -328,7 +320,7 @@ if __name__ == "__main__":
     
     solver = SPHSolver(particles, gamma=1.4, alpha=1.0, beta=1.0, eta=1.2)
     
-    solution = solver.solve(t_final=0.2, dt_max=0.0005, method='RK45')
+    solution = solver.solve(t_final=0.02, dt_max=0.05, method='RK45')
     
     if solution.success:
         solver.plot_solution(solution)
@@ -346,7 +338,7 @@ def create_shock_tube_animation(sol):
 
         state = sol.y[:, frame]
         x, v, rho, e = solver._unpack_state(state)
-        p = solver.equation_of_state(rho, e)
+        p = solver.p(rho, e)
         
         axes[0,0].plot(x, p, 'bo', markersize=2)
         axes[0,0].set_title(f'Pressure, t={sol.t[frame]:.3f}s')
