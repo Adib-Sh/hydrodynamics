@@ -27,11 +27,10 @@ class SPHSolver:
         m_avg = np.mean(self.m)
         self.h = self.eta * (m_avg / rho_avg)**(1.0)  # 1D
         
-        print(f"SPH Solver initialized:")
         print(f"  Particles: {self.N}")
         print(f"  Smoothing length h: {self.h:.6f}")
         print(f"  Gamma: {self.gamma}")
-        print(f"  Artificial viscosity: α={self.alpha}, β={self.beta}")
+        print(f"  Artificial viscosity: alpha={self.alpha}, beta={self.beta}")
         
         # Pack initial state for integrator
         self.y0 = self._pack_state()
@@ -190,7 +189,7 @@ class SPHSolver:
         
         return dy_dt
     
-    def solve(self, t_final=0.2, dt_max=1e-5, method='DOP853'):
+    def solve(self, t_final=0.2, dt_max=1e-5, method='RK45'):
 
         print(f"\nStarting SPH integration:")
         print(f"  Final time: {t_final}")
@@ -282,8 +281,6 @@ class SPHSolver:
         
 
 def setup_sod_shock_tube():
-
-    print("Setting up Sod's shock tube initial conditions...")
     
     N_left = 320
     N_right = 80
