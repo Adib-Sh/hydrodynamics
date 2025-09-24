@@ -388,7 +388,7 @@ if __name__ == "__main__":
     # solver
     solver = SPH3DSolver(particles, gamma=1.4, alpha=1.0, beta=1.0, eta=1.5)
     
-    solution = solver.solve(t_final=0.2, dt_max=1e-3, method='RK45')
+    solution = solver.solve(t_final=0.6, dt_max=1e-3, method='RK45')
     
     # Plot results
     if solution.success:
