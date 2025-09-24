@@ -393,7 +393,7 @@ if __name__ == "__main__":
     # Plot results
     if solution.success:
         solver.plot_3d_solution(solution)
-        solver.create_animation(solution, 'planetary_collision_test.mp4')
+        solver.create_animation(solution, 'planetary_collision_test.gif')
     
     print("3D planetary collision simulation complete!")
 
