@@ -5,11 +5,6 @@ from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.animation as animation
 
 
-intvar = 1
-gravity_on = 1
-twoplanets = 1
-
-
 # Load data
 planet_data = np.loadtxt('Planet300.dat')
 particles = len(planet_data)
@@ -17,7 +12,7 @@ particles = len(planet_data)
 # Define parameters
 kappa = 2
 gamma = 1.4
-h = 1e7
+h = 5e6
 G = 6.67408e-11
 
 # Initial conditions
