@@ -199,8 +199,8 @@ def sph(S):
     # Nearest neighbor mask
     kappa_mask = (r_u <= kappa*hmean[trii, trij]) & (r_u > 0)
 
-    pi = trii[kappa_mask]
-    pj = trij[kappa_mask]
+    p_i = trii[kappa_mask]
+    p_j = trij[kappa_mask]
     
 
         
@@ -240,14 +240,13 @@ def sph(S):
     # Artificial viscosity
     VdotX = np.sum(dV*dX, axis=0)
     maskVISC = (VdotX < 0) 
-    viscosity = np.zeros(len(pi))
+    viscosity = np.zeros(len(p_i))
     viscosity[maskVISC] = Pi_ij(r[maskVISC], dX[:,maskVISC], dV[:,maskVISC],
              rho_avg[maskVISC], hmean[maskVISC], c_avg[maskVISC], VdotX[maskVISC])
 
     
-    return pi, pj, W, dW, viscosity, dX, dV, hmean, r, trii, trij, grav_long
+    return p_i, p_j, W, dW, viscosity, dX, dV, hmean, r, trii, trij, grav_long
 
-#______________________________________ FUNCTION TO INTEGRATE _____________________________________#
 
 def integrate_flat(t, S_flat):
     # Logger
