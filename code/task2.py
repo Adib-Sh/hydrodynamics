@@ -53,7 +53,7 @@ class SPH3DSolver:
         return x, v, rho, e
         
     def kernel_cubic_spline_3d(self, r, h):
-
+        r = np.linalg.norm(r, axis=-1) if r.ndim > 1 else np.linalg.norm(r)
         R = np.abs(r) / h
         alpha_d = 3.0 / (2.0 * np.pi * h**3)  # 3D normalization
         
@@ -79,21 +79,21 @@ class SPH3DSolver:
         
         # Condition 0 ≤ R < 1
         mask1 = (R >= 0) & (R < 1)
-        dW_dr[mask1] = alpha_d * (-2*R[mask1] + 1.5*R[mask1]**2) / h
+        dW_dr[mask1] = alpha_d * (-2*R[mask1] + 1.5*R[mask1]) / h
         
         # Condition 1 ≤ R < 2
         mask2 = (R >= 1) & (R < 2)
-        dW_dr[mask2] = -alpha_d * 0.5 * (2 - R[mask2])**2 / (h * R[mask2] + 1e-12)
-        
+        dW_dr[mask2] = -alpha_d * 0.5 * (2 - R[mask2])**2 / (h)
+
         # Convert to gradient vector
         if r_vec.ndim > 1:
             safe_r = np.where(r < 1e-12, 1e-12, r)
-            grad_W = dW_dr[..., np.newaxis] * r_vec / safe_r[..., np.newaxis]
+            grad_W = dW_dr[..., np.newaxis] * r_vec
             grad_W[r < 1e-12] = 0
         else:
             safe_r = max(r, 1e-12)
-            grad_W = dW_dr * r_vec / safe_r if r > 1e-12 else np.zeros_like(r_vec)
-        
+            grad_W = dW_dr * r_vec 
+
         return grad_W
         
     def gravitational_potential_gradient(self, r, h):
@@ -378,7 +378,7 @@ if __name__ == "__main__":
     }
     
     # Create two planets
-    particles = create_two_planets(test_particles, separation=2.0, relative_velocity=0.5)
+    particles = create_two_planets(planet_data, separation=2.0, relative_velocity=0.5)
     
     # Add spin
     angular_velocity = np.array([0, 0, 0.5])  # spin around z-axis
@@ -388,7 +388,7 @@ if __name__ == "__main__":
     # solver
     solver = SPH3DSolver(particles, gamma=1.4, alpha=1.0, beta=1.0, eta=1.5)
     
-    solution = solver.solve(t_final=0.6, dt_max=1e-3, method='RK45')
+    solution = solver.solve(t_final=0.1, dt_max=1e-3, method='RK45')
     
     # Plot results
     if solution.success:
