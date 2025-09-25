@@ -43,7 +43,7 @@ N_total = len(planet_data['x'])
 def kernel_cubic_spline(r, h):
     """Cubic spline kernel for scalar distance r"""
     R = r / h
-    alpha_d = 3.0 / (2.0 * np.pi * h**3)  # 3D normalization
+    alpha_d = 3.0 / (2.0 * np.pi * h**3)
     
     W = np.zeros_like(R)
     
@@ -72,10 +72,13 @@ def kernel_gradient(r, h):
     mask2 = (R >= 1) & (R < 2)
     dW_dr[mask2] = -alpha_d * 0.5 * (2 - R[mask2])**2 / h
     
-    # Handle division by zero for r=0
-    dW_dr = np.where(r > 0, dW_dr / r, 0.0)
+    # Handle division by zero for r=0 more carefully
+    with np.errstate(divide='ignore', invalid='ignore'):
+        dW_dr_normalized = dW_dr / r
+        dW_dr_normalized = np.where((r > 1e-12) & np.isfinite(dW_dr_normalized), 
+                                   dW_dr_normalized, 0.0)
     
-    return dW_dr
+    return dW_dr_normalized
 
 def p(gamma, rho, e):
     return (gamma - 1.0) * rho * e
@@ -105,11 +108,7 @@ def artificial_viscosity(v_i, v_j, dx_ij, rho_i, rho_j, c_i, c_j, h):
     
     return Pi_ij
 
-# Number of time steps
-dt = 0.005
-n_steps = 40
-t_span = (0, dt * n_steps)
-t_eval = np.linspace(t_span[0], t_span[1], n_steps)
+
 
 def sph(t, y):
     N = N_total
@@ -142,7 +141,7 @@ def sph(t, y):
     
     # Calculate density using broadcasting with constant masses
     rho_new = np.sum(planet_data['m'][np.newaxis, :] * W_matrix, axis=1)  # (N,)
-    
+    y[6*N:7*N] = rho_new
     # Scale energies to avoid numerical issues - they're too large!
     e_scaled = e * 1e-13  # Scale down by 10^13
     
@@ -178,16 +177,19 @@ def sph(t, y):
     
     # Calculate pressure term
     pressure_term = p_i / rho_i**2 + p_j / rho_j**2 + Pi_ij[:, :, np.newaxis]  # (N, N, 1)
+    pressure_term_scalar = p_i / rho_i**2 + p_j / rho_j**2 + Pi_ij
+    
     
     # Mass matrix for broadcasting - use constant masses
-    m_matrix = planet_data['m'][np.newaxis, :, np.newaxis]  # (1, N, 1)
+    m_matrix = planet_data['m'][np.newaxis, :]  # (1, N)
     
     # Acceleration calculation - only sum over neighbors
-    dv_dt = -np.sum(m_matrix * pressure_term * grad_W_vector * mask_neighbors[:, :, np.newaxis], axis=1)  # (N, 3)
+    force_magnitude = m_matrix * pressure_term_scalar  # (N, N)
+    dv_dt = -np.sum(force_magnitude[:, :, np.newaxis] * grad_W_vector, axis=1)  # (N, 3)
     
     # Energy calculation
     v_diff_dot_grad = np.sum(v_matrix * grad_W_vector, axis=2)  # (N, N)
-    de_dt = 0.5 * np.sum(m_matrix[:, :, 0] * pressure_term[:, :, 0] * v_diff_dot_grad * mask_neighbors, axis=1)  # (N,)
+    de_dt = 0.5 * np.sum(m_matrix * pressure_term_scalar * v_diff_dot_grad * mask_neighbors, axis=1)  # (N,)
     
     # Scale back the energy derivative
     de_dt_scaled = de_dt * 1e-13  # Scale back up
@@ -219,6 +221,11 @@ y0 = np.concatenate([
 print(f"Initial state vector size: {len(y0)}")
 print(f"Expected size: 8 * N_total = {8 * N_total}")
 
+# Number of time steps
+dt = 0.005
+n_steps = 40
+t_span = (0, dt * n_steps)
+t_eval = np.linspace(t_span[0], t_span[1], n_steps)
 # Solve the ODE with smaller time steps for stability
 sol = solve_ivp(sph, t_span, y0, t_eval=t_eval, method='RK45', 
                 max_step=dt/100, rtol=1e-8, atol=1e-10)
