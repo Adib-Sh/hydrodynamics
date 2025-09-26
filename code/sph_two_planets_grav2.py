@@ -345,4 +345,36 @@ ani.save('SPH_2D_rotating_animation.gif', writer='pillow', fps=20)
 print("Simulation completed!")
 
 
+n_frames = len(solution.t)
+frame_indices = np.linspace(0, n_frames-1, 6, dtype=int)
+fig, axes = plt.subplots(3, 2, figsize=(12, 16))
+axes = axes.flatten()  # Make it easier to iterate
+
+for i, frame_idx in enumerate(frame_indices):
+    ax = axes[i]
+    S_frame = solution.y[:, frame_idx].reshape(N, N_total)
+    time = solution.t[frame_idx]
+    
+    colors = ['blue'] * particles + ['red'] * particles
+
+    scatter = ax.scatter(S_frame[:,0], S_frame[:,1], c=colors, s=8, alpha=0.7)
+    
+    ax.set_xlim(-2e8, 2e8)
+    ax.set_ylim(-2e8, 2e8)
+    ax.set_xlabel('x [m]')
+    ax.set_ylabel('y [m]')
+    
+    if i == 0:
+        ax.set_title(f'Initial State\nt = {time:.1f} s')
+    elif i == len(frame_indices)-1:
+        ax.set_title(f'Final State\nt = {time:.1f} s')
+    else:
+        ax.set_title(f'Stage {i+1}\nt = {time:.1f} s')
+    
+
+    ax.grid(True, alpha=0.3)
+    ax.set_aspect('equal')
+
+plt.tight_layout()
+plt.savefig('planetary_collision_stages.png', dpi=300, bbox_inches='tight')
 plt.show()
