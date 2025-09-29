@@ -323,7 +323,11 @@ t_span = (0, 1*12000)  # total time in seconds
 t_eval = np.linspace(t_span[0], t_span[1], 700)
 solution = solve_ivp(y, t_span, y0, method='RK45', t_eval=t_eval, max_step=25.0)
 
+plt.style.use('dark_background')
 fig2d, ax2d = plt.subplots(figsize=(8,8))
+fig2d.patch.set_facecolor('black')
+ax2d.set_facecolor('black')
+
 
 def update_2d(frame):
     ax2d.clear()
@@ -334,7 +338,7 @@ def update_2d(frame):
     S_frame = solution.y[:, frame].reshape(N, N_total)
     
     # Color by planet
-    colors = ['blue'] * particles + ['red'] * particles
+    colors = ['cyan'] * particles + ['magenta'] * particles
     scatter = ax2d.scatter(S_frame[:,0], S_frame[:,1], c=colors, s=5, alpha=0.7)
     ax2d.set_title(f'Rotating Planets: t={solution.t[frame]:.1f} s')
     return scatter,
@@ -348,14 +352,15 @@ print("Simulation completed!")
 n_frames = len(solution.t)
 frame_indices = np.linspace(0, n_frames-1, 6, dtype=int)
 fig, axes = plt.subplots(3, 2, figsize=(12, 16))
-axes = axes.flatten()  # Make it easier to iterate
+axes = axes.flatten()
+fig.patch.set_facecolor('black')
 
 for i, frame_idx in enumerate(frame_indices):
     ax = axes[i]
     S_frame = solution.y[:, frame_idx].reshape(N, N_total)
     time = solution.t[frame_idx]
     
-    colors = ['blue'] * particles + ['red'] * particles
+    colors = ['cyan'] * particles + ['magenta'] * particles
 
     scatter = ax.scatter(S_frame[:,0], S_frame[:,1], c=colors, s=8, alpha=0.7)
     
