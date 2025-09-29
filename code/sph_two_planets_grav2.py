@@ -259,10 +259,10 @@ def sph(S):
     return p_i, p_j, W, dW, viscosity, dX, dV, hmean, r, rii, rij, grav_long
 
 
-def integrate_flat(t, S_flat):
+def y(t, S_flat):
     # Logger
-    if int(t*1e-3) % 10 == 0:  
-        print(f"Integrating at t = {t:.2f} s")
+    if int(t*1e-5) % 10 == 0:  
+        print(f"Integrating at t = {t:.4f} s")
         
     S = S_flat.reshape(N, N_total)
     
@@ -318,10 +318,10 @@ def integrate_flat(t, S_flat):
 
 # Solver
 print("\nStarting simulation with rotating planets...")
-S_flat = S.reshape(-1)
+y0 = S.reshape(-1)
 t_span = (0, 1*12000)  # total time in seconds
 t_eval = np.linspace(t_span[0], t_span[1], 700)
-solution = solve_ivp(integrate_flat, t_span, S_flat, method='RK45', t_eval=t_eval, max_step=25.0)
+solution = solve_ivp(y, t_span, y0, method='RK45', t_eval=t_eval, max_step=25.0)
 
 fig2d, ax2d = plt.subplots(figsize=(8,8))
 
@@ -365,11 +365,11 @@ for i, frame_idx in enumerate(frame_indices):
     ax.set_ylabel('y [m]')
     
     if i == 0:
-        ax.set_title(f'Initial State\nt = {time:.1f} s')
+        ax.set_title(f'Initial State\nt = {time:.2f} s')
     elif i == len(frame_indices)-1:
-        ax.set_title(f'Final State\nt = {time:.1f} s')
+        ax.set_title(f'Final State\nt = {time:.2f} s')
     else:
-        ax.set_title(f'Stage {i+1}\nt = {time:.1f} s')
+        ax.set_title(f'Stage {i+1}\nt = {time:.2f} s')
     
 
     ax.grid(True, alpha=0.3)
